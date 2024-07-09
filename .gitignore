@@ -1,0 +1,39 @@
+# .gitignore for ServiceA
+
+# Ignore .idea directory
+ServiceA1/.idea/
+
+#Ignore .env file 
+ServiceA1/.env
+
+# Ignore .pytest_cache directory
+ServiceA1/.pytest_cache/
+
+# Ignore .venv directory
+ServiceA1/.venv/
+
+# Ignore __pycache__ directories
+ServiceA1/__pycache__/
+
+# .gitignore for ServiceB
+
+# Ignore __pycache__ directories
+ServiceB1/__pycache__/
+
+# Ignore __pycache__ directories
+ServiceB1/accessor/__pycache__/
+
+# Ignore .idea directory
+ServiceB1/.idea/
+
+# Ignore .venv directory
+ServiceB1/.venv/
+
+# Ignore instance directory
+ServiceB1/instance/
+
+#Ignore .env file 
+ServiceB1/.env
+
+#ignore dockerfile
+.docker-compose.yml
