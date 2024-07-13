@@ -171,3 +171,7 @@ def forward_news_request(user_id, preferences, username, email):
         logging.error(f"Request to News Aggregation Service failed: {str(e)}")
 
 
+
+if __name__ == "__main__":
+    logging.info("Flask manager Application started ")
+    app.run(host="0.0.0.0", port=80, debug=True)
