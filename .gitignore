@@ -1,39 +1,25 @@
-# .gitignore for ServiceA
+# FastAPI
+FastApi/.idea/
+FastApi/.venv/
+FastApi/__pycache__/
 
-# Ignore .idea directory
-ServiceA1/.idea/
+# Flask Service Manager
+FlaskServiceManager/.idea/
+FlaskServiceManager/.venv/
 
-#Ignore .env file 
-ServiceA1/.env
+# Email Bot
+FlaskServiceManager/email_bot/.idea/
+FlaskServiceManager/email_bot/.venv/
 
-# Ignore .pytest_cache directory
-ServiceA1/.pytest_cache/
+# News Aggregation
+FlaskServiceManager/news_aggregation/.idea/
+FlaskServiceManager/news_aggregation/.venv/
 
-# Ignore .venv directory
-ServiceA1/.venv/
+# Telegram Bot
+FlaskServiceManager/tel_bot/.idea/
+FlaskServiceManager/tel_bot/.venv/
 
-# Ignore __pycache__ directories
-ServiceA1/__pycache__/
-
-# .gitignore for ServiceB
-
-# Ignore __pycache__ directories
-ServiceB1/__pycache__/
-
-# Ignore __pycache__ directories
-ServiceB1/accessor/__pycache__/
-
-# Ignore .idea directory
-ServiceB1/.idea/
-
-# Ignore .venv directory
-ServiceB1/.venv/
-
-# Ignore instance directory
-ServiceB1/instance/
-
-#Ignore .env file 
-ServiceB1/.env
-
-#ignore dockerfile
-.docker-compose.yml
+# User Management
+FlaskServiceManager/user_management/.idea/
+FlaskServiceManager/user_management/.venv/
+FlaskServiceManager/user_management/__pycache__/
