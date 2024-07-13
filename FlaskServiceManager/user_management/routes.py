@@ -7,14 +7,13 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 import pika
 import json
-import os 
 
 
 bp = Blueprint('auth', __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-RABBITMQ_URL = os.getenv('RABBITMQ_URL', "amqp://guest:guest@localhost:5672/")
+RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672/"
 
 
 # Function to send messages to RabbitMQ
@@ -29,14 +28,18 @@ def send_to_rabbitmq(queue_name, message):
 
 @bp.route("/signup", methods=["POST"])
 def signup():
+    print("Received a request at signup", flush=True)
     data = request.get_json()
-    send_to_rabbitmq('signup_queue', data)
-    return jsonify({"message": "Signup request sent successfully"})
+    print(f"Received signup data: {data}")
+    # Process the signup data here
+    return jsonify({"message": "Signup request processed successfully"})
 
 
 @bp.route("/login", methods=["POST"])
 def login():
+    print("Received a request at login", flush=True)
     data = request.get_json()
+    print(f"Received login data: {data}")
     username = data.get("username")
     password = data.get("password")
 
@@ -57,25 +60,29 @@ def login():
     return jsonify({"username": db_user.username, "user_id": db_user.id, "message": "Login successful"})
 
 
+@bp.route("/call_service_u", methods=["GET"])
+def call_u():
+    print("Received a request at call_service_u", flush=True)
+    return jsonify({"message": "Hello from User Management Service!"}), 200
+
+
 @bp.route("/users/<int:user_id>/preferences", methods=["GET"])
 def get_user_preferences(user_id):
+    print(f"Received a request at /users/{user_id}/preferences", flush=True)
     try:
-        # Query the database for the user
         db: Session = next(get_db())
         user = db.query(User).filter_by(id=user_id).first()
 
-        # Check if user exists
         if user is None:
             abort(404, description=f"User with id {user_id} not found")
 
-        # Construct user data response
         user_data = {
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "preferences": user.preferences  # Assuming preferences is a field in your User model
+            "preferences": user.preferences
         }
-
+        print(f"Received user data: {user_data}")
         return jsonify(user_data), 200
 
     except Exception as e:
@@ -86,6 +93,7 @@ def get_user_preferences(user_id):
 
 @bp.route("/users/<int:user_id>/preferences/update", methods=["PUT"])
 def update_user_preferences(user_id):
+    print(f"Received a request at /users/{user_id}/preferences/update", flush=True)
     try:
         # Fetch preferences update from request body
         preferences_update = request.json.get("preferences")  # Assuming preferences are sent in the request body
@@ -120,63 +128,3 @@ def update_user_preferences(user_id):
 
     except Exception as e:
         abort(500, description=f"An error occurred: {str(e)}")
-
-
-
-
-# @bp.route("/signup", methods=["POST"])
-# def signup():
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-#     email = data.get("email")
-#     preferences = data.get("preferences", []) # Hash the password
-#     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-#
-#     # Hash the password
-#     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-#
-#     # Create a new User object and add it to the database
-#     db: Session = next(get_db())
-#     db_user = User(
-#         username=username,
-#         hashed_password=hashed_password.decode('utf-8'),
-#         email=email,
-#         preferences=preferences
-#     )
-#     db.add(db_user)
-#     db.commit()
-#
-#     # Refresh the db_user object to get the updated state from the database
-#     db.refresh(db_user)
-#
-#     # Log signup event
-#     logger.info(f"User {username} signed up with email {email}.")
-#
-#     # Return success message
-#     return jsonify({"message": "User created successfully"})
-#
-#
-# @bp.route("/login", methods=["POST"])
-# def login():
-#     data = request.get_json()
-#     username = data.get("username")
-#     password = data.get("password")
-#
-#     # Query the database for the user
-#     db: Session = next(get_db())
-#     db_user = db.query(User).filter(User.username == username).first()
-#
-#     # Check if the user exists and verify the password
-#     if not db_user or not bcrypt.checkpw(password.encode('utf-8'), db_user.hashed_password.encode('utf-8')):
-#         logger.warning(f"Failed login attempt for username {username}.")
-#         return jsonify({"error": "Invalid username or password"}), 400
-#
-#     # Log successful login
-#     logger.info(f"User {username} logged in successfully.")
-#
-#     # Return success message and username
-#     print(db_user.id)
-#     return jsonify({"username": db_user.username, "user_id": db_user.id, "message": "Login successful"})
-
-

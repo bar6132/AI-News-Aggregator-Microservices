@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 import psycopg2
@@ -11,17 +11,18 @@ from models import User  # Import the User model to ensure it's registered with 
 from consumers import process_signup, start_consumers
 from sqlalchemy.orm import sessionmaker
 
+
 app = Flask(__name__)
 app.register_blueprint(auth_bp)
 
 # Configuration
-DB_USER = os.getenv('POSTGRES_USER', 'postgres')
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', '6132')
-DB_HOST = os.getenv('POSTGRES_HOST', 'postgres')  # Use 'postgres' service name
-DB_PORT = os.getenv('POSTGRES_PORT', 5432)
-DB_NAME = os.getenv('POSTGRES_DB', 'Zionnet')
-RABBITMQ_URL = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq:5672/')
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_USER = 'postgres'
+DB_PASSWORD = 6132
+DB_HOST = 'postgres'  # Use 'postgres' service name
+DB_PORT = 5432
+DB_NAME = 'Zionnet'
+RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672/"
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,8 +65,8 @@ def create_tables():
 
 
 if __name__ == "__main__":
+    start_consumers()  # Start RabbitMQ consumers
     create_database()  # Ensure database exists
     create_tables()  # Ensure tables are created
-    start_consumers()  # Start RabbitMQ consumers
     logging.info("Application started and consumers are running.")
     app.run(host="0.0.0.0", port=8001, debug=True)

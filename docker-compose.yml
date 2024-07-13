@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  ############################
+  # FastAPI app + Dapr sidecar
+  ############################
   fastapi:
     build:
       context: ./FastApi
@@ -9,7 +12,33 @@ services:
       - "8000:80"
     environment:
       - SERVICE_B_URL=http://flaskmanager:80    # Updated to match the service name for flaskmanager
+    networks:
+      - network-dapr
 
+  fastapi-dapr:
+    image: "daprio/daprd:edge"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: ["./daprd",
+          "-app-port", "8000",
+          "-app-id", "fastapi",
+          "-app-protocol", "http",
+          "-dapr-http-port", "3501",
+          "-config", "/dapr/config.yaml"
+        ]
+    volumes:
+      - "./dapr/:/dapr"
+    depends_on:
+      - fastapi
+    network_mode: "service:fastapi"
+
+  ############################
+  # Flask Manager app + Dapr sidecar
+  ############################
   flaskmanager:
     build:
       context: ./FlaskServiceManager
@@ -24,8 +53,35 @@ services:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672  # Use service name 'rabbitmq'
       - USER_MANAGEMENT_URL=http://user_management:8001  # Corrected port
       - NEWS_AGGREGATION_URL=http://news_aggregation:8002  # Corrected port
+      - EMAIL_SERVICE_URL=http://email_service:8004
+      - TELEGRAM_BOT_URL=http://telegram_bot:8003
+    networks:
+      - network-dapr
 
+  flaskmanager-dapr:
+    image: "daprio/daprd:edge"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: ["./daprd",
+          "-app-port", "80",
+          "-app-id", "flaskmanager",
+          "-app-protocol", "http",
+          "-dapr-http-port", "3500",
+          "-config", "/dapr/config.yaml"
+      ]
+    volumes:
+      - "./dapr/:/dapr"
+    depends_on:
+      - flaskmanager
+    network_mode: "service:flaskmanager"
 
+  ############################
+  # News Aggregation app + Dapr sidecar
+  ############################
   news_aggregation:
     build:
       context: ./FlaskServiceManager/news_aggregation/
@@ -37,9 +93,33 @@ services:
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672  # Use service name 'rabbitmq'
       - BASE_URL=https://newsdata.io/api/1/latest
-      - API_KEY=pub_4797424ba30726a8d823c8e203845387fe464
-      - GOOGLE_API_KEY=AIzaSyBDcq_pW15jmoPhF4rLDShj2Ikq5OtP-eE
+    networks:
+      - network-dapr
 
+  news_aggregation-dapr:
+    image: "daprio/daprd:edge"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: ["./daprd",
+            "-app-port", "8002",
+            "-app-id", "news_aggregation",
+            "-app-protocol", "http",
+            "-dapr-http-port", "3502",
+            "-config", "/dapr/config.yaml"
+        ]
+    volumes:
+      - "./dapr/:/dapr"
+    depends_on:
+      - news_aggregation
+    network_mode: "service:news_aggregation"
+
+  ############################
+  # User Management app + Dapr sidecar
+  ############################
   user_management:
     build:
       context: ./FlaskServiceManager/user_management/
@@ -52,8 +132,59 @@ services:
     environment:
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672  # Use service name 'rabbitmq'
       - DATABASE_URL=postgresql://postgres:6132@postgres:5432/Zionnet  # Example of a database URL
+    networks:
+      - network-dapr
+
+  user_management-dapr:
+    image: "daprio/daprd:edge"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 10
+        window: 120s
+    command: ["./daprd",
+            "-app-port", "8001",
+            "-app-id", "user_management",
+            "-app-protocol", "http",
+            "-dapr-http-port", "3503",
+            "-config", "/dapr/config.yaml"
+        ]
+    volumes:
+      - "./dapr/:/dapr"
+    depends_on:
+      - user_management
+    network_mode: "service:user_management"
 
 
+
+  ############################
+  # Email Service app 
+  ############################
+  email_service:
+    build:
+      context: ./FlaskServiceManager/email_bot/
+      dockerfile: Dockerfile
+    ports:
+      - "8004:80"
+    networks:
+      - network-dapr
+
+  ############################
+  # Telegram Bot app 
+  ############################
+  telegram_bot:
+    build:
+      context: ./FlaskServiceManager/tel_bot/
+      dockerfile: Dockerfile
+    ports:
+      - "8003:80"
+    networks:
+      - network-dapr
+
+  ############################
+  # RabbitMQ service
+  ############################
   rabbitmq:
     image: "rabbitmq:3-management"
     ports:
@@ -64,7 +195,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-  
+    networks:
+      - network-dapr
+
+  ############################
+  # PostgreSQL service
+  ############################
   postgres:
     image: "postgres:latest"
     environment:
@@ -75,6 +211,12 @@ services:
       - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - network-dapr
+
+networks:
+  network-dapr:
+    driver: bridge
 
 volumes:
   postgres-data:

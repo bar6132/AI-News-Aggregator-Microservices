@@ -2,12 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import logging
-import os
-from dotenv import load_dotenv
 
-# load_dotenv()
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:6132@localhost:5432/Zionnet")
+RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672/"
+DATABASE_URL = "postgresql://postgres:6132@postgres:5432/Zionnet"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

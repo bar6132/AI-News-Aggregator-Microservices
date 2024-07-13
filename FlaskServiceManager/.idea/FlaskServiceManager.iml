@@ -5,6 +5,8 @@
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/news_aggregation/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/user_management/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/email_bot/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/tel_bot/.venv" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, abort
 import requests
-from requests.exceptions import RequestException
 import os
 import logging
 import pika
 import json
+import httpx
+from threading import Thread
 
 
 app = Flask(__name__)
@@ -33,27 +34,48 @@ def send_to_rabbitmq(queue, message):
     connection.close()
 
 
-@app.route('/call_service_b')
-def endpoint_b():
-    return jsonify(message="Hello from Service B")
+@app.route("/call_service_b", methods=["GET"])
+def call_service_b():
+    print("Received a request at call_service_b", flush=True)
+    return jsonify({"message": "Hello from Flask manager!"})
 
 
-@app.route("/call_service_b/news", methods=["GET"])
-def endpoint_b_news():
-    url = f"{NEWS_AGGREGATION_URL}/call"
-    headers = {"Content-Type": "application/json"}
+
+@app.route("/call_service_u", methods=["GET"])
+def call_service_u():
     try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return jsonify(response.json())
-    except requests.RequestException as e:
-        abort(500, description=f"Request failed: {str(e)}")
+        print("Received a request at /call_service_u", flush=True)
+        with httpx.Client() as client:
+            response = client.get("http://user_management:3503/v1.0/invoke/user_management/method/call_service_u")
+            response.raise_for_status()
+            json_response = response.json()
+            return jsonify(json_response), 200
+    except httpx.HTTPStatusError as e:
+        return jsonify({"error": f"HTTP error from User Management Service: {e}"}), e.response.status_code
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@app.route("/call_service_n", methods=["GET"])
+async def call_service_n():
+    try:
+        print("Received a request at /call_service_n", flush=True)
+        async with httpx.AsyncClient() as client:
+            response = await client.get("http://news_aggregation:3502/v1.0/invoke/news_aggregation/method/call_service_n")
+            response.raise_for_status()
+            json_response = response.json()
+            return jsonify(json_response), 200
+    except httpx.HTTPStatusError as e:
+        return jsonify({"error": f"HTTP error from News Aggregation Service: {e}"}), e.response.status_code
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
 @app.route('/signup', methods=['POST'])
 def forward_signup():
+    print(f"Received a request at /signup", flush=True)
+    data = request.get_json()
+    print(f"Request data: {data}", flush=True)
     try:
-        data = request.get_json()
         send_to_rabbitmq('signup_queue', data)
         return jsonify({"message": "Signup request sent successfully"})
     except Exception as e:
@@ -61,230 +83,91 @@ def forward_signup():
 
 
 @app.route('/login', methods=['POST'])
-def forward_login():
+async def forward_login():
+    print(f"Received a request at /login", flush=True)
+    data = request.get_json()
+    print(f"Request data: {data}", flush=True)
     try:
-        data = request.get_json()
-        response = requests.post(f"{USER_MANAGEMENT_URL}/login", json=data)
-        response.raise_for_status()  # Raise an exception for HTTP errors (status >= 400)
-        return jsonify(response.json())
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"http://user_management:3503/v1.0/invoke/user_management/method/login", json=data)
+            response.raise_for_status()
+            return jsonify(response.json())
 
-    except RequestException as e:
+    except httpx.RequestError as e:
         app.logger.error(f"Error during login: {str(e)}")
         return jsonify(error=f"Error during login: {str(e)}"), 500
 
 
 @app.route("/users/<int:user_id>/preferences", methods=["GET"])
-def get_user_preferences(user_id):
+async def get_user_preferences(user_id):
     try:
-        # Forwarding the request to User Management Service
-        url = f"{USER_MANAGEMENT_URL}/users/{user_id}/preferences"
-        headers = {"Content-Type": "application/json"}
-        response = requests.get(url, headers=headers)
+        print(f"Received a request at /users/{user_id}/preferences", flush=True)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://user_management:3503/v1.0/invoke/user_management/method/users/{user_id}/preferences"
+                , headers={"Accept": "application/json"}
+            )
+            response.raise_for_status()
+            json_response = response.json()
 
-        # Checking the response status code
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        elif response.status_code == 404:
-            abort(404, description="User not found")
-        elif response.status_code == 403:
-            abort(403, description="Not authorized to access this user's preferences")
-        else:
-            abort(response.status_code, description="Failed to fetch user preferences")
-    except requests.RequestException as e:
-        abort(500, description=f"Error connecting to User Management Service: {str(e)}")
+            return jsonify(json_response), 200
+
+    except httpx.HTTPStatusError as e:
+        abort(e.response.status_code, description=f"HTTP error from User Management Service: {e}")
+    except Exception as e:
+        abort(500, description=f"Internal server error: {str(e)}")
 
 
 @app.route("/users/<int:user_id>/preferences/update", methods=["PUT"])
-def update_user_preferences(user_id):
+async def update_user_preferences(user_id):
+    print(f"Received a request at users/{user_id}/preferences/update", flush=True)
+
     try:
         # Extract preferences update from request body
         preferences_update = request.json.get("preferences")  # Assuming preferences are sent in the request body
         print(preferences_update)
-        # Define the URL for the User Management Service
-        url = f"{USER_MANAGEMENT_URL}/users/{user_id}/preferences/update"
 
-        # Headers for the request
-        headers = {"Content-Type": "application/json"}
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"http://user_management:3503/v1.0/invoke/user_management/method/users/{user_id}/preferences/update",
+                json={"preferences": preferences_update}
+            )
+            response.raise_for_status()
+            return jsonify(response.json()), response.status_code
 
-        # Sending a PUT request to update user preferences
-        response = requests.put(url, json={"preferences": preferences_update}, headers=headers)
-
-        # Checking the response status code
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        elif response.status_code == 404:
-            abort(404, description="User not found")
-        elif response.status_code == 403:
-            abort(403, description="Not authorized to update this user's preferences")
-        else:
-            abort(response.status_code, description="Failed to update user preferences")
-
-    except requests.RequestException as e:
-        abort(500, description=f"Error connecting to User Management Service: {str(e)}")
-
+    except httpx.RequestError as e:
+        return jsonify(error=f"Error connecting to User Management Service: {str(e)}"), 500
+    except httpx.HTTPStatusError as e:
+        return jsonify(error=f"HTTP error: {str(e)}"), e.response.status_code
     except Exception as e:
-        abort(500, description=f"An error occurred: {str(e)}")
-
+        return jsonify(error=f"An error occurred: {str(e)}"), 500
 
 @app.route("/users/<int:user_id>/news", methods=["POST"])
 def fetch_news(user_id):
     try:
-        # Extract preferences from the request body
         preferences = request.json.get("preferences")
+        username = request.json.get("username")
+        email = request.json.get("email")
+
         if not preferences:
             abort(400, description="Preferences are required")
 
-        # Forward the request to the News Aggregation Service
-        response = requests.post(f"{NEWS_AGGREGATION_URL}/users/{user_id}/news", json={"preferences": preferences})
-        response.raise_for_status()
-        return jsonify(response.json())
-    except requests.RequestException as e:
+        # Forward the request to the News Aggregation Service via a background thread
+        Thread(target=forward_news_request, args=(user_id, preferences, username, email)).start()
+
+        return jsonify({"message": "News fetch request accepted and will be processed soon."})
+    except Exception as e:
         logging.error(f"Request failed: {str(e)}")
         abort(500, description=f"Request failed: {str(e)}")
 
-
-if __name__ == '__main__':
+def forward_news_request(user_id, preferences, username, email):
     try:
-        app.run(host='0.0.0.0', port=80, debug=True)
-    except Exception as e:
-        print(f"Exception occurred: {e}")
+        response = requests.post(
+            f"http://news_aggregation:3502/v1.0/invoke/news_aggregation/method/users/{user_id}/news",
+            json={"preferences": preferences, "username": username, "email": email}
+        )
+        response.raise_for_status()
+    except requests.RequestException as e:
+        logging.error(f"Request to News Aggregation Service failed: {str(e)}")
 
-
-
-
-# @app.route("/users/<int:user_id>/news", methods=["POST"])
-# def fetch_news(user_id):
-#     try:
-#         # Extract preferences from the request body
-#         preferences = request.json.get("preferences")
-#         if not preferences:
-#             abort(400, description="Preferences are required")
-#
-#         # Send message to RabbitMQ
-#         message = {
-#             "user_id": user_id,
-#             "preferences": preferences
-#         }
-#         send_to_rabbitmq('news_queue', message)
-#
-#         return jsonify({"message": "News fetch request sent successfully"})
-#     except requests.RequestException as e:
-#         logging.error(f"Request failed: {str(e)}")
-#         abort(500, description=f"Request failed: {str(e)}")
-#
-# @app.route('/call_service_b')
-# def endpoint_b():
-#     return jsonify(message="Hello from Service B")
-#
-#
-# @app.route("/call_service_b/news", methods=["GET"])
-# def endpoint_b_news():
-#     url = f"{NEWS_AGGREGATION_URL}/call"
-#     headers = {"Content-Type": "application/json"}
-#     try:
-#         response = requests.get(url, headers=headers)
-#         response.raise_for_status()
-#         return jsonify(response.json())
-#     except requests.RequestException as e:
-#         abort(500, description=f"Request failed: {str(e)}")
-#
-#
-# @app.route('/signup', methods=['POST'])
-# def forward_signup():
-#     try:
-#         data = request.get_json()
-#         response = requests.post(f"{USER_MANAGEMENT_URL}/signup", json=data)
-#         response.raise_for_status()  # Raise an exception for HTTP errors (status >= 400)
-#         return jsonify(response.json())
-#
-#     except requests.RequestException as e:
-#         return jsonify(error=f"Error during signup: {str(e)}"), 500
-#
-#
-# @app.route('/login', methods=['POST'])
-# def forward_login():
-#     try:
-#         data = request.get_json()
-#         response = requests.post(f"{USER_MANAGEMENT_URL}/login", json=data)
-#         response.raise_for_status()  # Raise an exception for HTTP errors (status >= 400)
-#         return jsonify(response.json())
-#
-#     except RequestException as e:
-#         app.logger.error(f"Error during login: {str(e)}")
-#         return jsonify(error=f"Error during login: {str(e)}"), 500
-#
-#
-# @app.route("/users/<int:user_id>/preferences", methods=["GET"])
-# def get_user_preferences(user_id):
-#     try:
-#         # Forwarding the request to User Management Service
-#         url = f"{USER_MANAGEMENT_URL}/users/{user_id}/preferences"
-#         headers = {"Content-Type": "application/json"}
-#         response = requests.get(url, headers=headers)
-#
-#         # Checking the response status code
-#         if response.status_code == 200:
-#             return jsonify(response.json()), 200
-#         elif response.status_code == 404:
-#             abort(404, description="User not found")
-#         elif response.status_code == 403:
-#             abort(403, description="Not authorized to access this user's preferences")
-#         else:
-#             abort(response.status_code, description="Failed to fetch user preferences")
-#     except requests.RequestException as e:
-#         abort(500, description=f"Error connecting to User Management Service: {str(e)}")
-#
-#
-# @app.route("/users/<int:user_id>/preferences/update", methods=["PUT"])
-# def update_user_preferences(user_id):
-#     try:
-#         # Extract preferences update from request body
-#         preferences_update = request.json.get("preferences")  # Assuming preferences are sent in the request body
-#         print(preferences_update)
-#         # Define the URL for the User Management Service
-#         url = f"{USER_MANAGEMENT_URL}/users/{user_id}/preferences/update"
-#
-#         # Headers for the request
-#         headers = {"Content-Type": "application/json"}
-#
-#         # Sending a PUT request to update user preferences
-#         response = requests.put(url, json={"preferences": preferences_update}, headers=headers)
-#
-#         # Checking the response status code
-#         if response.status_code == 200:
-#             return jsonify(response.json()), 200
-#         elif response.status_code == 404:
-#             abort(404, description="User not found")
-#         elif response.status_code == 403:
-#             abort(403, description="Not authorized to update this user's preferences")
-#         else:
-#             abort(response.status_code, description="Failed to update user preferences")
-#
-#     except requests.RequestException as e:
-#         abort(500, description=f"Error connecting to User Management Service: {str(e)}")
-#
-#     except Exception as e:
-#         abort(500, description=f"An error occurred: {str(e)}")
-#
-# ######################################################################
-# ######################################################################
-# ######################################################################
-# ######################################################################
-#
-#
-# @app.route("/users/<int:user_id>/news", methods=["POST"])
-# def fetch_news(user_id):
-#     try:
-#         # Extract preferences from the request body
-#         preferences = request.json.get("preferences")
-#         if not preferences:
-#             abort(400, description="Preferences are required")
-#
-#         # Forward the request to the News Aggregation Service
-#         response = requests.post(f"{NEWS_AGGREGATION_URL}/users/{user_id}/news", json={"preferences": preferences})
-#         response.raise_for_status()
-#         return jsonify(response.json())
-#     except requests.RequestException as e:
-#         logging.error(f"Request failed: {str(e)}")
-#         abort(500, description=f"Request failed: {str(e)}")
 

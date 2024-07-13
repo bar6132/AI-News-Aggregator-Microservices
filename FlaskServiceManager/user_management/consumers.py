@@ -6,10 +6,11 @@ import bcrypt
 from sqlalchemy.orm import Session
 import logging
 import os
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672/"
 
 
 def process_signup(ch, method, properties, body):
@@ -47,15 +48,28 @@ def process_signup(ch, method, properties, body):
         logger.error(f"Failed to process signup: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
-
 def consume_from_queue(queue_name, callback):
-    connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
-    channel = connection.channel()
-    channel.queue_declare(queue=queue_name, durable=True)
-    channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue=queue_name, on_message_callback=callback)
-    logger.info(f"Started consuming from queue {queue_name}...")
-    channel.start_consuming()
+    max_retries = 5
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
+            channel = connection.channel()
+            channel.queue_declare(queue=queue_name, durable=True)
+            channel.basic_qos(prefetch_count=1)
+            channel.basic_consume(queue=queue_name, on_message_callback=callback)
+            logger.info(f"Started consuming from queue {queue_name}...")
+            channel.start_consuming()
+            break
+        except pika.exceptions.AMQPConnectionError as e:
+            logger.error(f"Failed to connect to RabbitMQ: {e}")
+            attempt += 1
+            sleep_time = 2 ** attempt
+            logger.info(f"Retrying in {sleep_time} seconds...")
+            time.sleep(sleep_time)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            break
 
 
 def start_consumers():

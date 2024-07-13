@@ -1,0 +1,24 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: queue
+spec:
+  type: bindings.rabbitmq
+  version: v1
+  metadata:
+  - name: host
+    value: "amqp://rabbitmq:5672"
+  - name: queueName
+    value: queue
+  - name: durable
+    value: false
+  - name: deleteWhenUnused
+    value: true
+  - name: ttlInSeconds
+    value: 5
+  - name: prefetchCount
+    value: 3
+  - name: exclusive
+    value: false
+  - name: maxPriority
+    value: 5

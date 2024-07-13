@@ -2,10 +2,10 @@ import os
 import jwt
 from datetime import datetime, timedelta
 from jwt import encode as jwt_encode, ExpiredSignatureError
+from dotenv import load_dotenv
 
-
-SECRET_KEY = "8d32bfdb101ae60a669b6813e86ce5e5268197f0"
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY", "8d32bfdb101ae60a669b6813e86ce5e5268197f0")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
