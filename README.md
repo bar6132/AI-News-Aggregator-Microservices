@@ -4,6 +4,9 @@
 ## Overview
 This project is a microservice-based application designed to aggregate news and technology updates based on user preferences. The system fetches the latest news, uses AI to select the most interesting news based on user preferences, and optionally generates concise summaries using AI. The information is then sent to users via email and via Telegram to the project Manager.
 
+## Diagram
+![System Architecture](diagram.png)
+
 ## Features
 - **User Management:** Users can Register/Login and update their preferences for news categories and technology updates.
 - **News Aggregation:** The application fetches the latest news based on user preferences and sends the most interesting news to users.
