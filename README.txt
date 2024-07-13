@@ -36,7 +36,8 @@ This project is a microservice-based application designed to aggregate news and 
     │   ├── app.py
     │   └── ...
     ├── flask-manager-service
-    │		├── news-aggregation-service
+    │
+    │	├── news-aggregation-service
     │   	├── app.py
     │   	└── ...
     │  	├── user-management-service
@@ -48,8 +49,13 @@ This project is a microservice-based application designed to aggregate news and 
     │  	├── email_bot
     │   	├── app.py
     │   	└── ...
+    │	├── tel_bot
+    │   	├── app.py
+    │   	└── ...
+    │
     │   ├── manager_app.py
     │   └── ...
+    │
     ├── docker-compose.yml
     └── README.md
 ```
