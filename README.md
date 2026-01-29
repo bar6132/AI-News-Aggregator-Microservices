@@ -1,5 +1,5 @@
 
-# Personalized News Update Aggregator
+# 📰 NewsPulse — AI-Powered Microservices Aggregator
 
 ## Overview
 This project is a microservice-based application designed to aggregate news and technology updates based on user preferences. The system fetches the latest news, uses AI to select the most interesting news based on user preferences, and optionally generates concise summaries using AI. The information is then sent to users via email and via Telegram to the project Manager.
